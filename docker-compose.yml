@@ -1,0 +1,65 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: mediscan-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mediscan-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  backend:
+    build:
+      context: ./backend
+    container_name: mediscan-backend
+    restart: unless-stopped
+    environment:
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/mediscan}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-mediscan}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:8080}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1}
+      MEDICINE_DATASET_PATH: ${MEDICINE_DATASET_PATH:-/app/data/medicine_dataset.csv}
+      MEDICINE_DATASET_DIR: ${MEDICINE_DATASET_DIR:-/app/data}
+      MEDICINE_DATASET_GLOB: ${MEDICINE_DATASET_GLOB:-*.csv,*.xlsx,*.xls,*.parquet,*.pq,*.json,*.jsonl}
+      ENABLE_KAGGLE_DATASET: ${ENABLE_KAGGLE_DATASET:-false}
+      KAGGLE_DATASET_REF: ${KAGGLE_DATASET_REF:-shudhanshusingh/az-medicine-dataset-of-india}
+      KAGGLE_DATASET_FILE: ${KAGGLE_DATASET_FILE:-}
+      MEDICINE_DATASET_MIN_SCORE: ${MEDICINE_DATASET_MIN_SCORE:-82}
+      WATSON_TTS_API_KEY: ${WATSON_TTS_API_KEY:-}
+      WATSON_TTS_URL: ${WATSON_TTS_URL:-}
+      WATSON_STT_API_KEY: ${WATSON_STT_API_KEY:-}
+      WATSON_STT_URL: ${WATSON_STT_URL:-}
+    depends_on:
+      - mongo
+      - ollama
+    volumes:
+      - ./backend/data:/app/data
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    container_name: mediscan-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  mongo_data:
+  ollama_data:
